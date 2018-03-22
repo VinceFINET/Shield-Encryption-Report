@@ -1,0 +1,89 @@
+<apex:page docType="html-5.0" applyBodyTag="false" applyHtmlTag="false" showHeader="false">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <apex:slds />
+        <head>
+            <apex:stylesheet value="{!URLFOR($Asset.SLDS, 'assets/styles/salesforce-lightning-design-system-vf.css')}" />
+            <script src="{!URLFOR($Resource.CoE_SR_StaticResources, 'js/jquery.min.js')}"></script>
+            <script src="{!URLFOR($Resource.CoE_SR_StaticResources, 'js/jsforce.min.js')}"></script>
+        </head>
+        <body class="slds-scope">
+            <div class="slds-page-header">
+                <div class="slds-media">
+                    <div class="slds-media__figure">
+                        <span class="slds-icon_container slds-icon-standard-opportunity">
+                            <svg class="slds-icon" aria-hidden="true">
+                                <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/standard-sprite/svg/symbols.svg#solution')}" ></use>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="slds-media__body">
+                        <h1 class="slds-page-header__title slds-truncate slds-align-middle">Shield Encryption Report</h1>
+                        <p class="slds-text-body_small slds-line-height_reset">Number of objects scanned: <span id="totalNumberSObjects" /></p>
+                    </div>  
+                </div>
+            </div>
+
+            <div class="slds-progress-bar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" role="progressbar">
+                <span class="slds-progress-bar__value" style="width: 0%;">
+                    <span class="slds-assistive-text">Progress: 0%</span>
+                </span>
+            </div>
+
+            <table class="slds-table slds-table_bordered slds-table_cell-buffer">
+                <thead>
+                    <tr class="slds-text-title_caps">
+                        <th scope="col"><div class="slds-truncate">SObject Label</div></th>
+                        <th scope="col"><div class="slds-truncate">Field Label</div></th>
+                        <th scope="col"><div class="slds-truncate">Full API Name</div></th>
+                        <th scope="col"><div class="slds-truncate">Shield Encrypted</div></th>
+                    </tr>
+                </thead>
+                <tbody id="bodyTable" />
+            </table>
+            
+            <script>
+                window.onload = function() {
+
+                    // JQuery no conflict
+                    jQuery.noConflict();
+                    
+                    var conn = new jsforce.Connection({ 
+                        accessToken: '{!$Api.Session_Id}', 
+                        proxyUrl: '/services/proxy', 
+                        maxRequest : '10000',
+                        loginUrl: "https://test.salesforce.com", 
+                        version: '40.0'
+                    });
+                    conn.metadata.pollTimeout= 240000;
+
+                    conn.describeGlobal(function(err, res) {
+                        if (err) { return console.error(err); }
+                        var sobjects = res.sobjects;
+                        jQuery('#totalNumberSObjects')[0].innerText = sobjects.length;
+                        var tbody = jQuery('#bodyTable')[0];
+                        var progressbar = jQuery('span.slds-progress-bar__value')[0];
+                        var progressvalue = 0;
+                        for (var i=0; i<sobjects.length; i++) {
+                            conn.describe(sobjects[i].name, function(err2, res2) {
+                                if (err2) { return console.error(err2); }
+                                var currentObject = res2;
+                                var fields = res2.fields;
+                                for (var j=0; j<fields.length; j++) {
+                                    var currentField = fields[j];
+                                    if (currentField.encrypted == true) {
+                                        var trow = tbody.insertRow();
+                                        trow.insertCell().innerText = currentObject.label;
+                                        trow.insertCell().innerText = currentField.label;
+                                        trow.insertCell().innerText = currentObject.name+'.'+currentField.name;
+                                        trow.insertCell().innerText = currentField.encrypted;
+                                    }
+                                }
+                                progressbar.style.width = (++progressvalue/sobjects.length*100)+'%';
+                            });
+                        }
+                    });
+                }
+            </script>
+        </body>
+    </html>
+</apex:page>
